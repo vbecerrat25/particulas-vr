@@ -1,65 +1,72 @@
 import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-// 1. CONFIGURACIÓN BASE
+// 1. ESCENA Y RENDERER
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({ 
+    canvas: document.querySelector('#canvas3d'), 
+    antialias: true, 
+    alpha: true 
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true; 
-document.body.appendChild(renderer.domElement);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.xr.enabled = true;
 document.body.appendChild(VRButton.createButton(renderer));
 
-// 2. SISTEMA DE PARTÍCULAS
-const count = 15000;
+// Posición de cámara para que NO se vea cortado
+camera.position.z = 5; 
+
+// 2. PARTÍCULAS
+const count = 10000;
 const geometry = new THREE.BufferGeometry();
 const positions = new Float32Array(count * 3);
 const targets = new Float32Array(count * 3);
 for (let i = 0; i < count * 3; i++) positions[i] = (Math.random() - 0.5) * 10;
 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-const material = new THREE.PointsMaterial({ size: 0.02, color: 0x00ffcc, blending: THREE.AdditiveBlending });
+const material = new THREE.PointsMaterial({ size: 0.03, color: 0x00ffcc, transparent: true, blending: THREE.AdditiveBlending });
 const points = new THREE.Points(geometry, material);
-points.position.set(0, 1.5, -2); 
 scene.add(points);
 
-// 3. MANDOS VR (Visualización)
-const controllerModelFactory = new XRControllerModelFactory();
-const controller1 = renderer.xr.getController(0);
-const controllerGrip1 = renderer.xr.getControllerGrip(0);
-controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
-scene.add(controller1, controllerGrip1);
+// 3. LÓGICA DE INTERACCIÓN (Cámara)
+let mouseX = 0, mouseY = 0, handActive = false;
 
-const controller2 = renderer.xr.getController(1);
-const controllerGrip2 = renderer.xr.getControllerGrip(1);
-controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
-scene.add(controller2, controllerGrip2);
+const video = document.getElementById('video');
+const hands = new window.Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5 });
 
-// 4. LÓGICA DE DETECCIÓN (Cámara para PC)
-let handActive = false;
-let pointerPos = new THREE.Vector3();
+hands.onResults((results) => {
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        handActive = true;
+        const hand = results.multiHandLandmarks[0][9]; // Centro de la mano
+        mouseX = (hand.x - 0.5) * -10;
+        mouseY = (hand.y - 0.5) * -10;
+    } else {
+        handActive = false;
+    }
+});
 
-// Solo cargamos MediaPipe si NO estamos en modo VR
-if (!navigator.xr) {
-    // Aquí iría tu código anterior de MediaPipe para la cámara...
-    // (Omitido por brevedad, pero funcionará al detectar la webcam)
-}
+const cameraUtils = new window.Camera(video, {
+    onFrame: async () => { await hands.send({image: video}); },
+    width: 640, height: 480
+});
+cameraUtils.start().catch(() => console.log("Cámara no disponible (posible VR mode)"));
 
-// 5. GENERADOR DE FORMAS
+// 4. FORMAS
 function setTemplate(shape) {
     for (let i = 0; i < count; i++) {
         let x, y, z;
         const i3 = i * 3;
         if (shape === 'LETRA') {
-            x = (Math.random() - 0.5) * 3;
-            y = (i < count * 0.5) ? 0.4 : -0.4;
-            z = (Math.random() - 0.5) * 0.1;
+            x = (Math.random() - 0.5) * 4;
+            y = (i < count * 0.5) ? 0.5 : -0.5;
+            z = (Math.random() - 0.5) * 0.2;
         } else if (shape === 'TUBO') {
             const a = Math.random() * Math.PI * 2;
-            x = Math.cos(a) * 0.4; z = Math.sin(a) * 0.4; y = (Math.random() - 0.5) * 2;
-        } else {
-            const r = 0.7;
+            x = Math.cos(a) * 0.5; z = Math.sin(a) * 0.5; y = (Math.random() - 0.5) * 3;
+        } else { // SOL
+            const r = 1.2;
             const theta = Math.random() * Math.PI * 2, phi = Math.acos(2 * Math.random() - 1);
             x = Math.sin(phi) * Math.cos(theta) * r;
             y = Math.sin(phi) * Math.sin(theta) * r;
@@ -70,34 +77,38 @@ function setTemplate(shape) {
 }
 setTemplate('SOL');
 
-// 6. BUCLE DE ANIMACIÓN CON INTERACCIÓN
+// 5. ANIMACIÓN
 renderer.setAnimationLoop(() => {
     const pos = geometry.attributes.position;
-    const isVR = renderer.xr.isPresenting;
-    
     for (let i = 0; i < count; i++) {
         const i3 = i * 3;
-        let tx = targets[i3], ty = targets[i3+1], tz = targets[i3+2];
+        const dx = targets[i3] - pos.array[i3];
+        const dy = targets[i3+1] - pos.array[i3+1];
+        const dz = targets[i3+2] - pos.array[i3+2];
         
-        // INTERACCIÓN: Si el mando (o mano) está cerca, las partículas "explotan"
-        let dist;
-        if (isVR) {
-            dist = controller1.position.distanceTo(new THREE.Vector3(pos.array[i3], pos.array[i3+1]+1.5, pos.array[i3+2]-2));
+        // Si hay mano, las partículas huyen del puntero (Explosión)
+        if (handActive) {
+            const dist = Math.sqrt((pos.array[i3]-mouseX)**2 + (pos.array[i3+1]-mouseY)**2);
+            if (dist < 1.5) {
+                pos.array[i3] += (pos.array[i3] - mouseX) * 0.05;
+                pos.array[i3+1] += (pos.array[i3+1] - mouseY) * 0.05;
+            }
         }
-
-        if (dist < 0.3) { // Umbral de explosión
-            pos.array[i3] += (Math.random() - 0.5) * 0.5;
-            pos.array[i3+1] += (Math.random() - 0.5) * 0.5;
-        } else {
-            pos.array[i3] += (tx - pos.array[i3]) * 0.03;
-            pos.array[i3+1] += (ty - pos.array[i3+1]) * 0.03;
-            pos.array[i3+2] += (tz - pos.array[i3+2]) * 0.03;
-        }
+        
+        pos.array[i3] += dx * 0.05;
+        pos.array[i3+1] += dy * 0.05;
+        pos.array[i3+2] += dz * 0.05;
     }
-    
     pos.needsUpdate = true;
-    points.rotation.y += 0.002;
+    points.rotation.y += 0.003;
     renderer.render(scene, camera);
+});
+
+// Ajuste de pantalla
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
 document.getElementById('template').addEventListener('change', (e) => setTemplate(e.target.value));
