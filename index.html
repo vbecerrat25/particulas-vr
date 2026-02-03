@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>CITEccal VR Trujillo</title>
+    <link rel="stylesheet" href="./style.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div id="ui">
+        <h3>CONTROLES VR</h3>
+        <select id="template">
+            <option value="SOL">🌞 Sol</option>
+            <option value="SATURNO">🪐 Saturno</option>
+            <option value="LETRA">✍️ CITEccal Trujillo</option>
+            <option value="TUBO">🧪 Tubo</option>
+        </select>
+    </div>
+    <canvas id="canvas3d"></canvas>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
