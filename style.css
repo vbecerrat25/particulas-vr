@@ -1,7 +1,33 @@
-body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
-#ui {
-    position: absolute; top: 20px; left: 20px; z-index: 10;
-    background: rgba(0, 0, 0, 0.8); padding: 15px; border-radius: 10px;
-    border: 1px solid #00ffcc; color: white;
+body { 
+    margin: 0; 
+    background-color: #000; 
+    overflow: hidden; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
 }
-select { width: 100%; padding: 8px; background: #111; color: white; border: 1px solid #00ffcc; }
+
+#ui {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border-radius: 12px;
+    border: 2px solid #00ffcc;
+    color: white;
+    backdrop-filter: blur(5px);
+}
+
+#ui h3 { margin: 0 0 10px 0; font-size: 14px; letter-spacing: 1px; }
+
+select {
+    width: 100%;
+    padding: 10px;
+    background: #111;
+    color: #00ffcc;
+    border: 1px solid #00ffcc;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+canvas { display: block; }
